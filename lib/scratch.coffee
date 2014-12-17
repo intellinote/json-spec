@@ -1,8 +1,14 @@
-class JSONSpec
+EventEmitter = require('events').EventEmitter
+
+SINGLE_LINE_REGEXP = /\n/
+ISO_8601_REGEXP= /^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d{3})?(([A-Z]+)|([+-]\d{2}\:\d{2}))$/
+URI_REGEXP = /^[a-z]+\:.+/
+
+class JSONSpec extends EventEmitter
+
   normalize:(src)=>
     dst = {}
     for k,v of src
-      console.log k
       dst[k] = @_normalize_attributes(v)
     return dst
 
@@ -31,10 +37,40 @@ class JSONSpec
               v.push "inclusive"
             dst[k] = v
           else
-            console.error "WARNING: Found unexpected parameter \"#{k}\"."
+            @_emit_error_message "specification-error","Found unexpected parameter \"#{k}\"."
       if dst.items? and not dst.datatype is 'array'
-        console.error "WARNING: Found 'items' for non-array datatype \"#{dst.datatype}\"."
+        @_emit_error_message "specification-error","Found 'items' for non-array datatype \"#{dst.datatype}\"."
       return dst
+
+  _emit_error_message:(type,message,tail...)=>
+    console.error type,message,tail...
+
+  _emit_message:(type,message,tail...)=>
+    # console.log type,message,tail...
+
+  _emit_validation_error:(data,spec,message_id,path,value,expected)=>
+    path = path.join '.'
+    switch message_id
+      when 'required'
+        message = "Required attribute \"#{expected}\" not found at #{path}."
+      when 'datatype'
+        message = "Expected datatype \"#{expected}\" but found #{typeof value} at #{path}."
+      when 'enum'
+        message = "Expected one of #{expected.join(', ')} but found \"#{value}\" at #{path}."
+      when 'range'
+        message = "Expected value between #{expected[0]} and #{expected[1]} (#{expected[2] ? 'inclusive'}) but found #{value} at #{path}."
+      when 'format-required'
+        message = "Expected value to match #{expected} but found #{value} at #{path}."
+      when 'format-forbidden'
+        message = "Expected value not to match #{expected} but found #{value} at #{path}."
+      else
+        message = "Validation error (#{message_id})."
+        if expected?
+          message += " Expected \"#{expected}\"."
+        if value?
+          message += " Found \"#{found}\"."
+        message += " At #{path}"
+    @_emit_error_message "validation-error",message
 
   validate:(data,spec,path)=>
     valid = true
@@ -47,47 +83,45 @@ class JSONSpec
           valid = false
       else
         if v?.constraints? and 'required' in v.constraints
-          console.error "WARNING: Required attribute #{k} not found at",p
+          @_emit_validation_error(data,spec,'required',p,data)
+          valid = false
     return valid
 
   _validate_attribute:(attr,spec,path)=>
     if Array.isArray(spec)
-      console.log "ALTERNATIVES AT",path
       for alt,i in spec
         if @_validate_attribute(attr,alt,path)
-          console.log "RETURNING true DUE TO ALT",i
           return true
-      console.log "RETURNING false DUE TO NO MATCING ALT"
       return false
     else
       valid = true
       unless attr?
         if spec?.constraints? and 'required' in spec.constraints
-          console.error "WARNING: Required attribute not found at",path
+          @_emit_validation_error(attr,spec,'required',path,attr)
           valid = false
         else
-          console.log "ok (null) at",path
+          @_emit_message "ok","(null)",path
       else
         # DATATYPE
         switch spec.datatype
           when 'string'
             unless typeof attr is 'string'
-              console.error "expected string, found ",typeof attr," at",path
+              @_emit_validation_error(attr,spec,'datatype',path,attr,'string')
               valid = false
             else
-              console.log 'ok (string) at',path
+              @_emit_message "ok","(string)",path
           when 'number'
             unless typeof attr is 'number'
-              console.error "expected number, found ",typeof attr," at",path
+              @_emit_validation_error(attr,spec,'datatype',path,attr,'number')
               valid = false
             else
-              console.log 'ok (number) at',path
+              @_emit_message "ok","(number)",path
           when 'array'
             unless Array.isArray(attr)
-              console.error "expected array, found ",typeof attr," at",path
+              @_emit_validation_error(attr,spec,'datatype',path,attr,'array')
               valid = false
             else
-              console.log 'ok (array) at',path
+              @_emit_message "ok","(array)",path
               for elt,i in attr
                 p = [].concat(path)
                 p.push "[#{i}]"
@@ -95,9 +129,9 @@ class JSONSpec
                   valid = false
           when 'map'
             unless typeof attr is 'object'
-              console.error "expected map, found ",typeof attr," at",path
+              @_emit_validation_error(attr,spec,'datatype',path,attr,'object')
             else
-              console.log 'ok (map) at',path
+              @_emit_message "ok","(map)",path
               if spec.attributes?
                 for k,v of spec.attributes
                   p = [].concat(path)
@@ -105,53 +139,54 @@ class JSONSpec
                   if not @_validate_attribute(attr[k],v,p)
                     valid = false
           else
-            console.error "datatype ",spec.datatype,"not handled"," at",path
+            @_emit_validation_error(attr,spec,'not-supported',path,spec.datatype)
             valid = false
         # ENUM
         if spec.enum?
           unless attr in spec.enum
-            console.error "expected one of ",spec.enum,"found", attr," at",path
+            @_emit_validation_error(attr,spec,'enum',path,attr,spec.enum)
             valid = false
           else
-            console.log "ok (enum) at",path
+            @_emit_message "ok","(enum)",path
         # RANGE
         if spec.range?
           if spec.range.length is 2 or spec.range[2] is 'inclusive'
             unless spec.range[0] <= attr <= spec.range[1]
-              console.error "expected a value between ",spec.range,"found", attr," at",path
+              @_emit_validation_error(attr,spec,"range",path,attr,spec.range)
               valid = false
             else
-              console.log "ok (range) at",path
+              @_emit_message "ok","(range)",path
           else
             unless spec.range[0] < attr < spec.range[1]
-              console.error "expected a value between ",spec.range,"found", attr," at",path
+              @_emit_validation_error(attr,spec,"range",path,attr,spec.range)
               valid = false
             else
-              console.log "ok (range) at",path
+              @_emit_message "ok","(range)",path
         # FORMAT
         if spec.format?
           for f in spec.format
             switch f
               when 'singleline'
-                if /\n/.test attr
-                  console.error "expected a single-line string at ",path
+                if SINGLE_LINE_REGEXP.test attr
+                  @_emit_validation_error(attr,spec,"format-forbidden",path,attr,SINGLE_LINE_REGEXP)
                   valid = false
                 else
-                  console.log "ok (singleline) at",path
+                  @_emit_message "ok","(singleline)",path
               when 'iso8601date'
-                unless /^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d{3})?(([A-Z]+)|([+-]\d{2}\:\d{2}))$/.test attr
-                  console.error "expected an ISO 8601 formatted date at ",path,"found",attr
+                unless ISO_8601_REGEXP.test attr
+                  @_emit_validation_error(attr,spec,"format-required",path,attr,ISO_8601_REGEXP)
                   valid = false
                 else
-                  console.log "ok (iso8601date) at",path
+                  @_emit_message "ok","(iso8601date)",path
               when 'uri'
-                unless /^[a-z]+\:.+/.test attr
-                  console.error "expected a URI at ",path,"found",attr
+                unless URI_REGEXP.test attr
+                  @_emit_validation_error(attr,spec,"format-required",path,attr,URI_REGEXP)
                   valid = false
                 else
-                  console.log "ok (uri) at",path
-      console.log "RETURNING",valid
+                  @_emit_message "ok","(uri)",path
+      @_emit_message "returning",valid,path
       return valid
+
 
 ################################################################################
 
