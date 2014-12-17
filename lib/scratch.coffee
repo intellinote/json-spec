@@ -1,42 +1,161 @@
+class JSONSpec
+  normalize:(src)=>
+    dst = {}
+    for k,v of src
+      console.log k
+      dst[k] = @_normalize_attributes(v)
+    return dst
+
+  _normalize_attributes:(src)=>
+    if Array.isArray(src)
+      dst = []
+      for s in src
+        dst.push @_normalize_attributes(s)
+      return dst
+    else
+      dst = {}
+      for k,v of src
+        switch k
+          when 'datatype','default'
+            dst[k] = v
+          when 'attributes'
+            dst[k] = @normalize(v)
+          when 'items'
+            dst[k] = @_normalize_attributes(v)
+          when 'enum','constraints','format'
+            unless Array.isArray(v)
+              v = [ v ]
+            dst[k] = v
+          when 'range'
+            if v.length < 3
+              v.push "inclusive"
+            dst[k] = v
+          else
+            console.error "WARNING: Found unexpected parameter \"#{k}\"."
+      if dst.items? and not dst.datatype is 'array'
+        console.error "WARNING: Found 'items' for non-array datatype \"#{dst.datatype}\"."
+      return dst
+
+  validate:(data,spec,path)=>
+    valid = true
+    path ?= []
+    for k,v of spec
+      p = [].concat(path)
+      p.push(k)
+      if data?[k]?
+        if not @_validate_attribute(data[k],v,p)
+          valid = false
+      else
+        if v?.constraints? and 'required' in v.constraints
+          console.error "WARNING: Required attribute #{k} not found at",p
+    return valid
+
+  _validate_attribute:(attr,spec,path)=>
+    if Array.isArray(spec)
+      console.log "ALTERNATIVES AT",path
+      for alt,i in spec
+        if @_validate_attribute(attr,alt,path)
+          console.log "RETURNING true DUE TO ALT",i
+          return true
+      console.log "RETURNING false DUE TO NO MATCING ALT"
+      return false
+    else
+      valid = true
+      unless attr?
+        if spec?.constraints? and 'required' in spec.constraints
+          console.error "WARNING: Required attribute not found at",path
+          valid = false
+        else
+          console.log "ok (null) at",path
+      else
+        # DATATYPE
+        switch spec.datatype
+          when 'string'
+            unless typeof attr is 'string'
+              console.error "expected string, found ",typeof attr," at",path
+              valid = false
+            else
+              console.log 'ok (string) at',path
+          when 'number'
+            unless typeof attr is 'number'
+              console.error "expected number, found ",typeof attr," at",path
+              valid = false
+            else
+              console.log 'ok (number) at',path
+          when 'array'
+            unless Array.isArray(attr)
+              console.error "expected array, found ",typeof attr," at",path
+              valid = false
+            else
+              console.log 'ok (array) at',path
+              for elt,i in attr
+                p = [].concat(path)
+                p.push "[#{i}]"
+                if not @_validate_attribute(elt,spec.items,p)
+                  valid = false
+          when 'map'
+            unless typeof attr is 'object'
+              console.error "expected map, found ",typeof attr," at",path
+            else
+              console.log 'ok (map) at',path
+              if spec.attributes?
+                for k,v of spec.attributes
+                  p = [].concat(path)
+                  p.push(k)
+                  if not @_validate_attribute(attr[k],v,p)
+                    valid = false
+          else
+            console.error "datatype ",spec.datatype,"not handled"," at",path
+            valid = false
+        # ENUM
+        if spec.enum?
+          unless attr in spec.enum
+            console.error "expected one of ",spec.enum,"found", attr," at",path
+            valid = false
+          else
+            console.log "ok (enum) at",path
+        # RANGE
+        if spec.range?
+          if spec.range.length is 2 or spec.range[2] is 'inclusive'
+            unless spec.range[0] <= attr <= spec.range[1]
+              console.error "expected a value between ",spec.range,"found", attr," at",path
+              valid = false
+            else
+              console.log "ok (range) at",path
+          else
+            unless spec.range[0] < attr < spec.range[1]
+              console.error "expected a value between ",spec.range,"found", attr," at",path
+              valid = false
+            else
+              console.log "ok (range) at",path
+        # FORMAT
+        if spec.format?
+          for f in spec.format
+            switch f
+              when 'singleline'
+                if /\n/.test attr
+                  console.error "expected a single-line string at ",path
+                  valid = false
+                else
+                  console.log "ok (singleline) at",path
+              when 'iso8601date'
+                unless /^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d{3})?(([A-Z]+)|([+-]\d{2}\:\d{2}))$/.test attr
+                  console.error "expected an ISO 8601 formatted date at ",path,"found",attr
+                  valid = false
+                else
+                  console.log "ok (iso8601date) at",path
+              when 'uri'
+                unless /^[a-z]+\:.+/.test attr
+                  console.error "expected a URI at ",path,"found",attr
+                  valid = false
+                else
+                  console.log "ok (uri) at",path
+      console.log "RETURNING",valid
+      return valid
 
 ################################################################################
 
-normalize = (src)->
-  dst = {}
-  for k,v of src
-    console.log k
-    dst[k] = normalize_attributes(v)
-  return dst
-
-normalize_attributes = (src)->
-  if Array.isArray(src)
-    dst = []
-    for s in src
-      dst.push normalize_attributes(s)
-    return dst
-  else
-    dst = {}
-    for k,v of src
-      switch k
-        when 'datatype','default'
-          dst[k] = v
-        when 'attributes'
-          dst[k] = normalize(v)
-        when 'items'
-          dst[k] = normalize_attributes(v)
-        when 'enum','constraints','format'
-          unless Array.isArray(v)
-            v = [ v ]
-          dst[k] = v
-        when 'range'
-          if v.length < 3
-            v.push "inclusive"
-          dst[k] = v
-        else
-          console.error "WARNING: Found unexpected parameter \"#{k}\"."
-    if dst.items? and not dst.datatype is 'array'
-      console.error "WARNING: Found 'items' for non-array datatype \"#{dst.datatype}\"."
-    return dst
+json_spec = new JSONSpec()
 
 ################################################################################
 
@@ -156,130 +275,9 @@ root =
             }
           ]
 
-
-################################################################################
-root = normalize(root)
-# console.log JSON.stringify(root,null,2)
-
 ################################################################################
 
-validate = (data,spec,path)->
-  valid = true
-  path ?= []
-  for k,v of spec
-    p = [].concat(path)
-    p.push(k)
-    if data?[k]?
-      # inner_validate(data[k],v,p)
-      if not validate_attribute(data[k],v,p)
-        valid = false
-    else
-      if v?.constraints? and 'required' in v.constraints
-        console.error "WARNING: Required attribute #{k} not found at",p
-  return valid
-
-validate_attribute = (attr,spec,path)->
-  if Array.isArray(spec)
-    console.log "ALTERNATIVES AT",path
-    for alt,i in spec
-      if validate_attribute(attr,alt,path)
-        console.log "RETURNING true DUE TO ALT",i
-        return true
-    console.log "RETURNING false DUE TO NO MATCING ALT"
-    return false
-  else
-    valid = true
-    unless attr?
-      if spec?.constraints? and 'required' in spec.constraints
-        console.error "WARNING: Required attribute not found at",path
-        valid = false
-      else
-        console.log "ok (null) at",path
-    else
-      # DATATYPE
-      switch spec.datatype
-        when 'string'
-          unless typeof attr is 'string'
-            console.error "expected string, found ",typeof attr," at",path
-            valid = false
-          else
-            console.log 'ok (string) at',path
-        when 'number'
-          unless typeof attr is 'number'
-            console.error "expected number, found ",typeof attr," at",path
-            valid = false
-          else
-            console.log 'ok (number) at',path
-        when 'array'
-          unless Array.isArray(attr)
-            console.error "expected array, found ",typeof attr," at",path
-            valid = false
-          else
-            console.log 'ok (array) at',path
-            for elt,i in attr
-              p = [].concat(path)
-              p.push "[#{i}]"
-              if not validate_attribute(elt,spec.items,p)
-                valid = false
-        when 'map'
-          unless typeof attr is 'object'
-            console.error "expected map, found ",typeof attr," at",path
-          else
-            console.log 'ok (map) at',path
-            if spec.attributes?
-              for k,v of spec.attributes
-                p = [].concat(path)
-                p.push(k)
-                if not validate_attribute(attr[k],v,p)
-                  valid = false
-        else
-          console.error "datatype ",spec.datatype,"not handled"," at",path
-          valid = false
-      # ENUM
-      if spec.enum?
-        unless attr in spec.enum
-          console.error "expected one of ",spec.enum,"found", attr," at",path
-          valid = false
-        else
-          console.log "ok (enum) at",path
-      # RANGE
-      if spec.range?
-        if spec.range.length is 2 or spec.range[2] is 'inclusive'
-          unless spec.range[0] <= attr <= spec.range[1]
-            console.error "expected a value between ",spec.range,"found", attr," at",path
-            valid = false
-          else
-            console.log "ok (range) at",path
-        else
-          unless spec.range[0] < attr < spec.range[1]
-            console.error "expected a value between ",spec.range,"found", attr," at",path
-            valid = false
-          else
-            console.log "ok (range) at",path
-      # FORMAT
-      if spec.format?
-        for f in spec.format
-          switch f
-            when 'singleline'
-              if /\n/.test attr
-                console.error "expected a single-line string at ",path
-                valid = false
-              else
-                console.log "ok (singleline) at",path
-            when 'iso8601date'
-              unless /^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d{3})?(([A-Z]+)|([+-]\d{2}\:\d{2}))$/.test attr
-                console.error "expected an ISO 8601 formatted date at ",path,"found",attr
-                valid = false
-              else
-                console.log "ok (iso8601date) at",path
-            when 'uri'
-              unless /^[a-z]+\:.+/.test attr
-                console.error "expected a URI at ",path,"found",attr
-                valid = false
-              else
-                console.log "ok (uri) at",path
-    console.log "RETURNING",valid
-    return valid
+root = json_spec.normalize(root)
 
 ################################################################################
 
@@ -320,6 +318,7 @@ data = note: {
 }
 
 ################################################################################
+
 console.log "VALIDATING"
-console.log validate(data,root)
+console.log json_spec.validate(data,root)
 console.log "DONE"
