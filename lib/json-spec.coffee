@@ -38,8 +38,6 @@ class JSONSpec extends EventEmitter
       return @parse_spec src.toString()
     catch err
       throw err
-      # console.error err,err.stack
-      # throw new Error("Error parsing JSON file at \"#{file}\".",err)
 
   parse_spec:(src)=>
     if typeof src is 'string'
@@ -100,7 +98,6 @@ class JSONSpec extends EventEmitter
       return dst
 
   validate:(spec,data,path=[],error_listener)=>
-    # console.log "validate",JSON.stringify(spec)
     error_listener ?= new ErrorReporter()
     valid = true
     path ?= []
@@ -119,30 +116,10 @@ class JSONSpec extends EventEmitter
         else
           @_emit_validation_error(error_listener,data,spec,'unexpected',path,v,k)
 
-      # else
-      #   if spec[k]?.constraints? and 'required' in v.constraints
-      #     unless options?.ignore_errors
-      #       @_emit_validation_error(error_listener,data,spec,'required',p,data)
-      #     valid = false
-    # for k,v of spec
-    #   p = [].concat(path)
-    #   p.push(k)
-    #   if data?[k]?
-    #     if not @_validate_attribute(v,data[k],p,error_listener)
-    #       valid = false
-    #   else
-    #     if v?.constraints? and 'required' in v.constraints
-    #       unless options?.ignore_errors
-    #         @_emit_validation_error(error_listener,data,spec,'required',p,data)
-    #       valid = false
-    return valid
-
   _validate_attribute:(spec,attr,path,error_listener)=>
-    # console.log "validate_attribute ",spec,spec?.datatype,JSON.stringify(attr)
     if Array.isArray(spec)
       error_collector = new ErrorCollector()
       for alt,i in spec
-        # console.log "TESTING ALT #{i}",JSON.stringify(alt)
         if @_validate_attribute(alt,attr,path,error_collector)
           return true
       @_emit_validation_error(error_listener,attr,spec,'no-matching-alt',path,attr,error_collector.errors)
@@ -315,7 +292,6 @@ if require.main is module
   else
     json_spec = new JSONSpec()
     spec = json_spec.load_spec process.argv[2]
-    # console.log spec
     if process.argv.length >= 4
       data = Util.load_json_file_sync(process.argv[3])
     else
