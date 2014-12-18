@@ -1,4 +1,7 @@
 example/spec.json
+example/spec.html
+example/spec.md
+bin/json-spec
 *.html
 docco
 lib-cov

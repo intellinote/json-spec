@@ -276,7 +276,7 @@ class JSONSpec extends EventEmitter
 exports.JSONSpec = JSONSpec
 
 if require.main is module
-  if process.argv.length < 2 or /^-?-?h(elp)?$/.test process.argv[2]
+  if process.argv.length < 3 or /^-?-?h(elp)?$/.test process.argv[2]
     path = require 'path'
     console.error "Use: #{path.basename(process.argv[1])} validate SPEC.JSON DATA.JSON"
     console.error " or: cat DATA.JSON | #{path.basename(process.argv[1])} validate SPEC.JSON"

@@ -124,7 +124,7 @@ help:
 ################################################################################
 # CLEAN UP TARGETS
 
-clean: clean-coverage clean-docco clean-docs clean-js clean-module clean-test-module-install clean-node-modules
+clean: clean-coverage clean-docco clean-docs clean-js clean-module clean-test-module-install clean-node-modules clean-bin
 
 clean-test-module-install:
 	rm -rf $(TEST_MODULE_INSTALL_DIR)
@@ -178,10 +178,11 @@ clean-markdown:
 # 	mv module $(PACKAGE_DIR)
 # 	tar -czf $(PACKAGE_DIR).tgz $(PACKAGE_DIR)
 
-module: clean js
+module: clean js bin
 	mkdir -p $(MODULE_DIR)
 	cp -r lib $(MODULE_DIR)
 	cp -r example $(MODULE_DIR)
+	cp -r bin $(MODULE_DIR)
 	cp $(PACKAGE_JSON) $(MODULE_DIR)
 	cp Makefile $(MODULE_DIR)
 	cp LICENSE.txt $(MODULE_DIR)
@@ -278,3 +279,14 @@ docco: $(COFFEE_SRCS) $(NODE_MODULES)
 .SUFFIXES: .coffee
 .coffee:
 	$(COFFEE_EXE) $< >  $@
+
+js-bin: js
+	$(foreach f,$(shell ls ./lib/*.js 2>/dev/null),chmod a+x "$(f)" && cp bin/.shebang.sh "bin/`basename $(f) | sed 's/...$$//'`";)
+
+coffee-bin:
+	$(foreach f,$(shell ls ./lib/*.coffee 2>/dev/null),chmod a+x "$(f)" && cp bin/.shebang.sh "bin/`basename $(f) | sed 's/.......$$//'`";)
+
+bin: coffee-bin
+
+clean-bin:
+	$(foreach f,$(shell ls ./lib/*.coffee 2>/dev/null),rm -rf "bin/`basename $(f) | sed 's/.......$$//'`";)
