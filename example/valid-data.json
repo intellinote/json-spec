@@ -1,37 +1,52 @@
 {
-  "note": {
-    "type":"task",
-    "id":"7514d9ad-b2e5-4c04-7803-c4c283afcf8d",
-    "title":"Title of Note",
-    "body": {
-      "text/html": "<div>Body of note in <b>HTML</b> format.</div>"
-    },
-    "tags":["set","of-tag","strings"],
-    "created":"2014-12-14T18:53:30.807Z",
-    "modified":"2014-12-14T18:53:30.807Z",
-    "creator":{
-      "user-id":"john@example.net"
-    },
-    "location":{
-      "latitude":38.960341,
-      "longitude":-77.254459,
-      "elevation":1608.6379,
-      "resolution":4.771975,
-      "label":"Reston Town Center"
-    },
-    "links": [
-      {
-        "relation":"attachment",
-        "uri":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==",
-        "mime-type":"image/jpeg",
-        "title":"Photo of My Cat",
-        "filename":"cat-photo.jpg",
-        "created":"2014-12-14T18:53:30.807Z",
-        "modified":"2014-12-14T18:53:30.807Z",
-        "creator":{
-          "user-id":"john@example.net"
+  "meta-data": {
+    "version":"1.0.0"
+  },
+  "workspaces": [
+    {
+      "people": {
+        "john@example.net": {
+          "vcard":"..."
         }
-      }
-    ]
-  }
+      },
+      "name":"Workspace 1",
+      "notes": [
+        {
+          "type":"task",
+          "id":"7514d9ad-b2e5-4c04-7803-c4c283afcf8d",
+          "title":"Title of Note",
+          "body": {
+            "text/html": "<div>Body of note in <b>HTML</b> format.</div>"
+          },
+          "tags":["set","of-tag","strings"],
+          "created":"2014-12-14T18:53:30.807Z",
+          "modified":"2014-12-14T18:53:30.807Z",
+          "creator":{
+            "user-id":"john@example.net"
+          },
+          "location":{
+            "latitude":38.960341,
+            "longitude":-77.254459,
+            "elevation":1608.6379,
+            "resolution":4.771975,
+            "label":"Reston Town Center"
+          },
+          "links": [
+            {
+              "relation":"attachment",
+              "uri":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==",
+              "mime-type":"image/jpeg",
+              "title":"Photo of My Cat",
+              "filename":"cat-photo.jpg",
+              "created":"2014-12-14T18:53:30.807Z",
+              "modified":"2014-12-14T18:53:30.807Z",
+              "creator":{
+                "user-id":"john@example.net"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
