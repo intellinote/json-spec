@@ -1,7 +1,7 @@
 {
   "name"        : "json-spec",
   "version"     : "0.3.0",
-  "description" : "A CoffeeScript/JavaScript DSL for defining, documenting and validation JSON structures",
+  "description" : "A CoffeeScript/JavaScript DSL for defining, documenting and validating JSON structures",
   "repository"  : { "type": "git", "url": "https://github.com/intellinote/json-spec.git" },
   "bugs"        : { "url": "https://github.com/intellinote/json-spec/issues" },
   "license"     : "MIT",
