@@ -161,25 +161,36 @@ clean-markdown:
 ################################################################################
 # NPM TARGETS
 
-module: js test docs coverage
+# module: js test docs coverage
+# 	mkdir -p $(MODULE_DIR)
+# 	cp -r docs $(MODULE_DIR)
+# 	cp -r config $(MODULE_DIR)
+# 	rm -rf $(MODULE_DIR)/docs/docco
+# 	cp -r lib $(MODULE_DIR)
+# 	cp -r test $(MODULE_DIR)
+# 	cp $(PACKAGE_JSON) $(MODULE_DIR)
+# 	cp Makefile $(MODULE_DIR)
+# 	cp LICENSE.txt $(MODULE_DIR)
+# 	cp README.md $(MODULE_DIR)
+# 	find module -type f -name "*.md-toc" -exec rm -f {} \;
+# 	find module -type f -name "*.litcoffee-toc" -exec rm -f {} \;
+# 	find module -type f -name "*.x" -exec rm -f {} \;
+# 	mv module $(PACKAGE_DIR)
+# 	tar -czf $(PACKAGE_DIR).tgz $(PACKAGE_DIR)
+
+module: clean js
 	mkdir -p $(MODULE_DIR)
-	cp -r docs $(MODULE_DIR)
-	cp -r config $(MODULE_DIR)
-	rm -rf $(MODULE_DIR)/docs/docco
 	cp -r lib $(MODULE_DIR)
-	cp -r test $(MODULE_DIR)
+	cp -r example $(MODULE_DIR)
 	cp $(PACKAGE_JSON) $(MODULE_DIR)
 	cp Makefile $(MODULE_DIR)
 	cp LICENSE.txt $(MODULE_DIR)
 	cp README.md $(MODULE_DIR)
-	find module -type f -name "*.md-toc" -exec rm -f {} \;
-	find module -type f -name "*.litcoffee-toc" -exec rm -f {} \;
-	find module -type f -name "*.x" -exec rm -f {} \;
 	mv module $(PACKAGE_DIR)
 	tar -czf $(PACKAGE_DIR).tgz $(PACKAGE_DIR)
 
-test-module-install: clean-test-module-install js test docs coverage module $(PACKAGE_DIR).tgz
-	mkdir -p $(TEST_MODULE_INSTALL_DIR); cd $(TEST_MODULE_INSTALL_DIR); npm install "$(CURDIR)/$(PACKAGE_DIR).tgz"; node -e "require('assert').ok(require('json-spec'));" && cd $(CURDIR) && rm -rf $(TEST_MODULE_INSTALL_DIR) && echo "\n\nIT WORKED!\n\n"
+test-module-install: clean-test-module-install module $(PACKAGE_DIR).tgz
+	mkdir -p $(TEST_MODULE_INSTALL_DIR); cd $(TEST_MODULE_INSTALL_DIR); npm install "$(CURDIR)/$(PACKAGE_DIR).tgz"; node -e "require('assert').ok(require('json-spec').JSONSpec);" && cd $(CURDIR) && rm -rf $(TEST_MODULE_INSTALL_DIR) && echo "\n\nIT WORKED!\n\n"
 
 $(NODE_MODULES): $(PACKAGE_JSON)
 	$(NPM_EXE) $(NPM_ARGS) prune
