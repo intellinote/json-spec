@@ -26,6 +26,11 @@ class ErrorCollector extends ErrorListener
   on_error:(type,message,tail...)=>
     @errors.push [type,message,tail...]
 
+enum_to_string = (options)->
+  if options.length is 1
+    return options[0]
+  else
+    return "one of " + Util.smart_join(options,", "," or ")
 
 class JSONSpec extends EventEmitter
 
@@ -66,7 +71,7 @@ class JSONSpec extends EventEmitter
       dst = {}
       for k,v of src
         switch k
-          when 'datatype','default'
+          when 'datatype','default','description'
             dst[k] = v
           when 'attributes'
             dst[k] = @normalize(v)
@@ -122,7 +127,7 @@ class JSONSpec extends EventEmitter
       for alt,i in spec
         if @_validate_attribute(alt,attr,path,error_collector)
           return true
-      @_emit_validation_error(error_listener,attr,spec,'no-matching-alt',path,attr,error_collector.errors)
+      @_emit_validation_error(error_listener,attr,spec,'no-matching-alt',path,attr,"\n\t"+error_collector.errors.join("\n\t"))
       return false
     else
       valid = true
@@ -162,7 +167,6 @@ class JSONSpec extends EventEmitter
             unless typeof attr is 'object'
               @_emit_validation_error(error_listener,attr,spec,'datatype',path,attr,'object')
             else
-              # TODO - change this to look at every element of data, not spec
               @_debug "ok","(map)",path,spec
               for k,v of attr
                 p = [].concat(path)
@@ -174,13 +178,6 @@ class JSONSpec extends EventEmitter
                 else
                   valid = false
                   @_emit_validation_error(error_listener,data,spec,'unexpected',path,v,k)
-
-              # if spec.attributes?
-              #   for k,v of spec.attributes
-              #     p = [].concat(path)
-              #     p.push(k)
-              #     if not @_validate_attribute(v,attr[k],p,error_listener)
-              #       valid = false
           else
             @_emit_validation_error(error_listener,attr,spec,'not-supported',path,spec.datatype)
             valid = false
@@ -256,12 +253,7 @@ class JSONSpec extends EventEmitter
       when 'datatype'
         message = "Expected datatype \"#{expected}\" but found #{typeof value} at #{path}."
       when 'enum'
-        message = "Expected "
-        if expected?.length > 1
-          message += "one of " + expected[0...expected.length-1].map((x)->"\"#{x}\"").join(', ') + " or \"#{expected[expected.length-1]}\" "
-        else
-          message += "\"#{expected[0]}\" "
-        message += "but found \"#{value}\" at #{path}."
+        message = "Expected " + enum_to_string(expected.map((x)->"\"#{x}\"")) + " but found \"#{value}\" at #{path}."
       when 'range'
         message = "Expected value between #{expected[0]} and #{expected[1]} (#{expected[2] ? 'inclusive'}) but found #{value} at #{path}."
       when 'format-required'
@@ -284,17 +276,115 @@ class JSONSpec extends EventEmitter
 exports.JSONSpec = JSONSpec
 
 if require.main is module
-  if process.argv.length < 3
+  if process.argv.length < 2 or /^-?-?h(elp)?$/.test process.argv[2]
     path = require 'path'
-    console.error "Use: #{path.basename(process.argv[1])} SPEC.JSON DATA.JSON"
-    console.error " or: cat DATA.JSON | #{path.basename(process.argv[1])} SPEC.JSON"
+    console.error "Use: #{path.basename(process.argv[1])} validate SPEC.JSON DATA.JSON"
+    console.error " or: cat DATA.JSON | #{path.basename(process.argv[1])} validate SPEC.JSON"
     process.exit(1)
   else
     json_spec = new JSONSpec()
-    spec = json_spec.load_spec process.argv[2]
-    if process.argv.length >= 4
-      data = Util.load_json_file_sync(process.argv[3])
-    else
-      data = Util.load_json_stdin_sync()
-    unless json_spec.validate(spec,data)
-      process.exit(2)
+    spec = json_spec.load_spec process.argv[3]
+    switch process.argv[2]
+      when 'validate'
+        if process.argv.length >= 4
+          data = Util.load_json_file_sync(process.argv[4])
+        else
+          data = Util.load_json_stdin_sync()
+        unless json_spec.validate(spec,data)
+          process.exit(2)
+      when 'normalize'
+        console.log JSON.stringify(spec,null,2)
+      when 'to-text'
+        visit = (key,elt,indent)=>
+          if Array.isArray(elt)
+            console.log "#{indent} (alternative formats allowed)"
+            indent += "  "
+            for e,i in elt
+              visit("(alternative ##{i+1})",e,indent)
+          else
+            parts = [ ]
+            if indent.length > 0
+              parts.push indent
+            if key?
+              parts.push key
+              parts.push " - "
+            if elt.description?
+              parts.push elt.description + " "
+            bracketed = []
+            if elt.datatype?
+              bracketed.push elt.datatype
+            if elt.format?
+              bracketed.push (elt.format.map (x)->
+                if x.matching?
+                  return "matching #{x.matching}"
+                else if x['not-matching']
+                  return "not matching #{x['not-matching']}"
+                else
+                  return x).join(',')
+            if elt.enum?
+              bracketed.push enum_to_string(elt.enum.map (x)->"\"#{x}\"")
+            if elt.constraints?
+              bracketed.push  elt.constraints.join(', ')
+            if bracketed.length > 0
+              parts.push "[#{bracketed.join(', ')}]"
+            console.log parts.join("")
+            if elt.attributes?
+              for k,v of elt.attributes
+                visit(k,v,indent+"  ")
+            if elt.items?
+                visit("(elements)",elt.items,indent+"  ")
+        visit(null,spec,"")
+
+      when 'to-markdown'
+        visit = (key,elt,indent)=>
+          parts = [ ]
+          if indent.length > 0
+            parts.push indent
+            parts.push " * "
+          if key?
+            if key is "*"
+              parts.push "*(any key)*"
+            else if key is "(elements)"
+              parts.push "*(elements)*"
+            else
+              parts.push "**`"+key+"`**"
+            parts.push " - "
+          else
+            parts.push "# "
+          if Array.isArray(elt)
+            parts.push "(alternative formats allowed)"
+            console.log parts.join("")
+            indent += "  "
+            for e,i in elt
+              visit("(alternative ##{i+1})",e,indent)
+          else
+            if elt.description?
+              parts.push "*"+elt.description + "* "
+            bracketed = []
+            if elt.datatype?
+              bracketed.push elt.datatype
+            if elt.format?
+              bracketed.push (elt.format.map (x)->
+                if x.matching?
+                  return "matching `#{x.matching}`"
+                else if x['not-matching']
+                  return "not matching `#{x['not-matching']}`"
+                else
+                  return x).join(', ')
+            if elt.enum?
+              bracketed.push enum_to_string(elt.enum.map (x)->"\"#{x}\"")
+            if elt.range?
+              bracketed.push "between #{elt.range[0]} and #{elt.range[1]}, #{elt.range[2]}"
+            if elt.constraints?
+              bracketed.push  elt.constraints.join(', ')
+            if elt.default?
+              bracketed.push "defaults to `#{elt.default}`"
+            if bracketed.length > 0
+              parts.push "<small style=\"color:#666;\">[#{bracketed.join(', ')}]</small>"
+            console.log parts.join("")
+            if elt.attributes?
+              for k,v of elt.attributes
+                visit(k,v,indent+"  ")
+            if elt.items?
+                visit("(elements)",elt.items,indent+"  ")
+        visit(null,spec,"")

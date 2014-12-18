@@ -34,10 +34,10 @@
           "links": [
             {
               "relation":"attachment",
-              "uri":"note a real url",
+              "uri":"not a real url",
               "mime-type":"image/jpeg",
               "title":"Photo of My Cat",
-              "filename":"cat-photo.jpg",
+              "filename":"cat-\nphoto.jpg",
               "created":"2014-12-14T18:53:30.807Z",
               "modified":"2014-12-14T18:53:30.807Z",
               "creator":{
